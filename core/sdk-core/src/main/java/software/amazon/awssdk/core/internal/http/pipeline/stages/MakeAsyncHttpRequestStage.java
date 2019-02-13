@@ -15,6 +15,8 @@
 
 package software.amazon.awssdk.core.internal.http.pipeline.stages;
 
+import static software.amazon.awssdk.http.Header.CONTENT_LENGTH;
+
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Optional;
@@ -35,7 +37,6 @@ import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.core.interceptor.SdkInternalExecutionAttribute;
 import software.amazon.awssdk.core.internal.Response;
 import software.amazon.awssdk.core.internal.http.HttpClientDependencies;
-import software.amazon.awssdk.core.internal.http.InterruptMonitor;
 import software.amazon.awssdk.core.internal.http.RequestExecutionContext;
 import software.amazon.awssdk.core.internal.http.TransformingAsyncResponseHandler;
 import software.amazon.awssdk.core.internal.http.async.SimpleHttpContentPublisher;
@@ -83,7 +84,6 @@ public final class MakeAsyncHttpRequestStage<OutputT>
     @Override
     public CompletableFuture<Response<OutputT>> execute(SdkHttpFullRequest request,
                                                         RequestExecutionContext context) throws Exception {
-        InterruptMonitor.checkInterrupted();
         return executeHttpRequest(request, context);
     }
 
@@ -148,20 +148,20 @@ public final class MakeAsyncHttpRequestStage<OutputT>
     private SdkHttpFullRequest getRequestWithContentLength(SdkHttpFullRequest request, SdkHttpContentPublisher requestProvider) {
         if (shouldSetContentLength(request, requestProvider)) {
             return request.toBuilder()
-                          .putHeader("Content-Length", String.valueOf(requestProvider.contentLength().get()))
+                          .putHeader(CONTENT_LENGTH, String.valueOf(requestProvider.contentLength().get()))
                           .build();
         }
         return request;
     }
 
     private boolean shouldSetContentLength(SdkHttpFullRequest request, SdkHttpContentPublisher requestProvider) {
-        return requestProvider != null
-               && !request.firstMatchingHeader("Content-Length").isPresent()
-               && requestProvider.contentLength().isPresent()
-               // Can cause issues with signing if content length is present for these method
-               && request.method() != SdkHttpMethod.GET
-               && request.method() != SdkHttpMethod.HEAD;
 
+        if (request.method() == SdkHttpMethod.GET || request.method() == SdkHttpMethod.HEAD ||
+            request.firstMatchingHeader(CONTENT_LENGTH).isPresent()) {
+            return false;
+        }
+
+        return Optional.ofNullable(requestProvider).map(SdkHttpContentPublisher::contentLength).isPresent();
     }
 
     private TimeoutTracker setupAttemptTimer(CompletableFuture<Response<OutputT>> executeFuture, RequestExecutionContext ctx) {

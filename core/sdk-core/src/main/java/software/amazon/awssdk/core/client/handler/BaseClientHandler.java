@@ -29,6 +29,7 @@ import software.amazon.awssdk.core.interceptor.ExecutionInterceptorChain;
 import software.amazon.awssdk.core.interceptor.InterceptorContext;
 import software.amazon.awssdk.core.interceptor.SdkExecutionAttribute;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
+import software.amazon.awssdk.http.SdkHttpFullResponse;
 import software.amazon.awssdk.utils.StringUtils;
 
 @SdkProtectedApi
@@ -39,11 +40,28 @@ public abstract class BaseClientHandler {
         this.clientConfiguration = clientConfiguration;
     }
 
+    /**
+     * Finalize {@link SdkRequest} by running before execution interceptors and modifying request interceptors.
+     *
+     * @param executionContext the execution context
+     * @return the {@link InterceptorContext}
+     */
     static InterceptorContext finalizeSdkRequest(ExecutionContext executionContext) {
         runBeforeExecutionInterceptors(executionContext);
         return runModifyRequestInterceptors(executionContext);
     }
 
+    /**
+     * Finalize {@link SdkHttpFullRequest} by running before marshalling interceptors and after marshalling interceptors
+     *
+     * @param executionParams
+     * @param executionContext
+     * @param inputT
+     * @param clientConfiguration
+     * @param <InputT>
+     * @param <OutputT>
+     * @return
+     */
     static <InputT extends SdkRequest, OutputT> InterceptorContext finalizeSdkHttpFullRequest(
         ClientExecutionParams<InputT, OutputT> executionParams,
         ExecutionContext executionContext, InputT inputT,
